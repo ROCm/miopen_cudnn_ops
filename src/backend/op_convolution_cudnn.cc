@@ -493,7 +493,7 @@ void op_convolution_cudnn::print_bwd_time(const float kernel_average_time) {
                         // ,algo(fwd),workspace,time(ms),gflops,efficiency(%)");
                 fprintf(fp, ",%s,%s,%.2f,%.2f,%.2f%%",
                     "unsupported", "0",
-                    0, 0, 0);
+                    0.0, 0.0, 0.0);
                 fclose(fp);
             }
         }
@@ -567,7 +567,7 @@ void op_convolution_cudnn::print_wrw_time(const float kernel_average_time) {
                         // ,algo(wrw),workspace,time(ms),gflops,efficiency(%)");
                 fprintf(fp, ",%s,%s,%.2f,%.2f,%.2f%%",
                     "unsupported", "0",
-                    0, 0, 0);
+                    0.0, 0.0, 0.0);
                 fprintf(fp,"\n");
                 fclose(fp);
             }
