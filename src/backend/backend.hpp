@@ -436,6 +436,7 @@ static inline cudnnPoolingMode_t to_cudnn_pooling_mode(pooling_mode mode){
             return CUDNN_POOLING_AVERAGE_COUNT_INCLUDE_PADDING;
         default:
             assert(0 && "unsupported pooling mode");
+            return CUDNN_POOLING_MAX;
     }
 }
 static inline cudnnActivationMode_t to_cudnn_activation_mode(activation_mode mode){
@@ -454,6 +455,7 @@ static inline cudnnActivationMode_t to_cudnn_activation_mode(activation_mode mod
             return CUDNN_ACTIVATION_IDENTITY;
         default:
             assert(0 && "unsupported act mode");
+            return CUDNN_ACTIVATION_SIGMOID;
     }
 }
 static inline cudnnConvolutionMode_t to_cudnn_convolution_mode(convolution_mode mode){
