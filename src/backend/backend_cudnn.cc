@@ -16,9 +16,9 @@ static inline void dump_dev_prop(cudaDeviceProp * prop, int dev_id){
 
 device_cuda::device_cuda(int dev_id){
     this->type = DEVICE_CUDA;
-    int devcount;
     CHECK_CU(cuInit(0));
 #if 0
+    int devcount;
     CHECK_CUDA(cudaGetDeviceCount(&devcount));
     assert(dev_id < devcount && "dev request must small than available ");
 
