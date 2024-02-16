@@ -72,7 +72,7 @@ private:
 template<class blockwise_t, class threadwise_t, class... args_t>
 void naive_conv_blockwise_in_parallel(threadwise_t thread_func, args_t... args)
 {
-    int num_threads = std::thread::hardware_concurrency();
+    size_t num_threads = std::thread::hardware_concurrency();
     std::vector<std::thread> threads(num_threads);
 
     for(size_t tid = 0; tid < num_threads; tid++)
