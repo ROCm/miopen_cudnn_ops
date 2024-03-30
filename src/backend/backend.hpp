@@ -165,6 +165,10 @@ struct convolution_desc_t{
     void * desc_wrw;    // cudnn, wrw NHWC fp16 seems only support PSEUDO_HALF_CONFIG
 };
 
+#define MAX_CONV_DIM 2
+struct rnn_desc_t{
+};
+
 #define MAX_POOLING_DIM 2
 struct pooling_desc_t{
     pooling_mode mode;
@@ -247,6 +251,8 @@ public:
         int * kernel, int * stride, int * padding, int * dilation, int n_dims,
         int groups, int k, int input_c, int input_h, int input_w) = 0;
     virtual void convolution_desc_destroy(convolution_desc_t * conv_desc) = 0;
+    virtual rnn_desc_t * rnn_desc_create() = 0;
+    virtual void rnn_desc_destroy(rnn_desc_t * rnn_desc) = 0;
 
     workspace * ws = {nullptr};
 };
@@ -364,6 +370,14 @@ public:
         int * kernel, int * stride, int * padding, int * dilation, int n_dims,
         int groups, int k, int input_c, int input_h, int input_w);
     virtual void convolution_desc_destroy(convolution_desc_t * conv_desc);
+    virtual rnn_desc_t * rnn_desc_create() {
+        rnn_desc_t * rnn_desc = new rnn_desc_t;
+
+        return rnn_desc;
+    };
+    virtual void rnn_desc_destroy(rnn_desc_t * rnn_desc) {
+        delete rnn_desc;
+    };
 };
 void dump_miopen_convolution_desc(const miopenConvolutionDescriptor_t conv_desc);
 void dump_miopen_tensor_desc(const miopenTensorDescriptor_t tensor_desc);
@@ -486,10 +500,10 @@ public:
 
     virtual tensor_t * tensor_create(size_t * dims, size_t n_dim,
                     tensor_data_type data_type, tensor_layout layout);
-	/*
+    /*
     tensor_t * filter_create(size_t * dims, size_t n_dim,
                     tensor_data_type data_type, tensor_layout layout);
-					*/
+                    */
     virtual void tensor_alloc(tensor_t * tensor);
     virtual void tensor_copy(void *dest, void *src, size_t bytes, tensor_copy_kind copy_kind);
     virtual void tensor_destroy(tensor_t * tensor);
@@ -505,6 +519,8 @@ public:
         int * kernel, int * stride, int * padding, int * dilation, int n_dims,
         int groups, int k, int input_c, int input_h, int input_w);
     virtual void convolution_desc_destroy(convolution_desc_t * conv_desc);
+    virtual rnn_desc_t * rnn_desc_create();
+    virtual void rnn_desc_destroy(rnn_desc_t * rnn_desc);
 };
 
 /* utility */
@@ -582,6 +598,14 @@ public:
     virtual void convolution_desc_destroy(convolution_desc_t * conv_desc){
         delete conv_desc;
     }
+    virtual rnn_desc_t * rnn_desc_create() {
+        rnn_desc_t * rnn_desc = new rnn_desc_t;
+
+        return rnn_desc;
+    };
+    virtual void rnn_desc_destroy(rnn_desc_t * rnn_desc) {
+        delete rnn_desc;
+    };
 };
 
 
@@ -617,18 +641,18 @@ static inline int util_compare_data(void * m1, void * m2,
 }
 
 static inline void util_b2s(size_t bytes, char * str){
-	if(bytes<1024){
-		sprintf(str, "%luB", bytes);
-	}else if(bytes<(1024*1024)){
-		double b= (double)bytes/1024.0;
-		sprintf(str, "%.2fKB", b);
-	}else if(bytes<(1024*1024*1024)){
-		double b= (double)bytes/(1024.0*1024);
-		sprintf(str, "%.2fMB", b);
-	}else{
-		double b= (double)bytes/(1024.0*1024*1024);
-		sprintf(str, "%.2fGB", b);
-	}
+    if(bytes<1024){
+        sprintf(str, "%luB", bytes);
+    }else if(bytes<(1024*1024)){
+        double b= (double)bytes/1024.0;
+        sprintf(str, "%.2fKB", b);
+    }else if(bytes<(1024*1024*1024)){
+        double b= (double)bytes/(1024.0*1024);
+        sprintf(str, "%.2fMB", b);
+    }else{
+        double b= (double)bytes/(1024.0*1024*1024);
+        sprintf(str, "%.2fGB", b);
+    }
 }
 
 static inline std::string util_b2string(size_t bytes)

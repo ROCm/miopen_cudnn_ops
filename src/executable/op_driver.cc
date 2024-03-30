@@ -77,7 +77,7 @@ static int valid_vector_rms(float *lhs, T *rhs, size_t num, float *rms_error, fl
 
     double rms = std::sqrt(square_difference) / (std::sqrt(num) * mag);
     if(rms_error)
-		*rms_error = rms;
+        *rms_error = rms;
     return rms < threshold? 1:0;
 #else
     size_t i;
@@ -91,8 +91,8 @@ static int valid_vector_rms(float *lhs, T *rhs, size_t num, float *rms_error, fl
         d+=delta*delta;
     }
     double rms = sqrt(d/sx);
-	if(rms_error)
-		*rms_error = rms;
+    if(rms_error)
+        *rms_error = rms;
     // printf("(%.12f)",rms);
     return rms < threshold? 1:0;
     //return 0;
@@ -102,7 +102,7 @@ static int valid_vector_rms(float *lhs, T *rhs, size_t num, float *rms_error, fl
 #define EF_PRT
 
 #define LOOP_WARMUP 3
-#define LOOP_ITR    7
+#define LOOP_ITR    10
 
 static device_base * determin_device(){
     std::string backend;
@@ -149,8 +149,8 @@ void inline b2s(size_t bytes, char * str){
 
 template<typename dtype>
 void rand_float(dtype * vec, int len, float min, float max){
-	(void)vec;
-	(void)len;
+    (void)vec;
+    (void)len;
 }
 
 template<>
@@ -644,8 +644,8 @@ static int conv_driver(int argc, char ** argv){
     assert(in_layout == fil_layout && in_layout == out_layout);
     enum tensor_layout layout = tensor_string_to_layout(in_layout);
 
-	// TODO: currently do verify at fp32 only
-	// is_verify &= tensor_dtype == TENSOR_DT_FLOAT ? 1 : 0;
+    // TODO: currently do verify at fp32 only
+    // is_verify &= tensor_dtype == TENSOR_DT_FLOAT ? 1 : 0;
 
     debug_msg("Conv2d(input=(%lu,%lu,%lu,%lu), output_channels=(%lu), kernel_size=(%d,%d), "
             "stride=(%d,%d), padding=(%d,%d), bias=%s\n\tgroups=(%d), "
@@ -669,12 +669,12 @@ static int conv_driver(int argc, char ** argv){
     else if (cmode == "cross_correlation") conv_mode = CONVOLUTION_CROSS_CORRELATION;
     else {std::cout<<"unsupported conv mode "<<cmode<<std::endl; return -1;}
 
-	// TODO: only consider conv mode, aka cross_correlation in miopen
+    // TODO: only consider conv mode, aka cross_correlation in miopen
 #ifdef WITH_MIOPEN
     conv_mode = CONVOLUTION_CONV;
 #endif
 #ifdef WITH_CUDNN
-	conv_mode = CONVOLUTION_CROSS_CORRELATION;
+    conv_mode = CONVOLUTION_CROSS_CORRELATION;
 #endif
 
     int _ksize[2] = {fil_h, fil_w};
@@ -817,7 +817,7 @@ static int conv_driver(int argc, char ** argv){
 
         if (is_verify) {
             float nrms= get_nrms("fwd", tensor_dtype);
-			// TODO: float only!
+            // TODO: float only!
             float *fwd_out_cpu = new float[t_out_c->elem()];
             float *in_cpu    = (float*)t_in_c->mem;
             float *fil_cpu   = (float*)t_filter_c->mem;
@@ -891,7 +891,7 @@ static int conv_driver(int argc, char ** argv){
             op_conv->print_bwd_time(dt->elapsed() / num_iterations);
 
         if (is_verify) {
-			// TODO: float only!
+            // TODO: float only!
             float nrms= get_nrms("bwd", tensor_dtype);
             float *in_grad_cpu = new float[t_in_grad_c->elem()];
             float err{0.};
@@ -964,7 +964,7 @@ static int conv_driver(int argc, char ** argv){
             op_conv->print_wrw_time(dt->elapsed() / num_iterations);
 
         if (is_verify) {
-			// TODO: float only!
+            // TODO: float only!
             float nrms= get_nrms("wrw", tensor_dtype);
             float *filter_grad_cpu = new float[t_filter_grad_c->elem()];
             float err{0.};
@@ -1185,6 +1185,150 @@ static int act_driver(int argc, char ** argv){
 }
 #endif
 
+#if 1
+template<typename dtype>
+static int rnn_driver(int argc, char ** argv){
+    arg_parser parser("rnn");
+    parser.insert_arg("batchsize", 'n', "4", "Mini-batch size.", "vector");
+    parser.insert_arg("bias", 'b', "0", "Use Bias.", "int");
+    parser.insert_arg("bidirection", 'r', "0", "0 uni- or 1 bi-direction.", "int");
+    parser.insert_arg("datatype", 'f', "1", "16-bit or 32-bit fp.", "int");
+    parser.insert_arg("dropout", 'P', "0.0", "Dropout rate.", "float");
+    parser.insert_arg("dump_output", 'o', "0", "Dumps the output buffers.", "int");
+    parser.insert_arg("forw", 'F', "0", "Run only Forward RNN == 1 or only Backward Data RNN == 2, Backward Weights = 4 or all == 0.", "int");
+    parser.insert_arg("fwdtype", 'c', "0", "RNN forward being 0 training or 1 inference.", "int");
+    parser.insert_arg("hid_h", 'H', "32", "Hidden State Length.", "int");
+    parser.insert_arg("in_h", 'W', "32", "Input Length.", "int");
+    parser.insert_arg("inputmode", 'p', "0", "linear == 0 or skip == 1.", "int");
+    parser.insert_arg("iter", 'i', "10", "Number of Iterations.", "int");
+    parser.insert_arg("mode", 'm', "tanh", "RNN Mode (relu, tanh, lstm, gru).", "str");
+    parser.insert_arg("num_layer", 'l', "1", "Number of hidden stacks.", "int");
+    parser.insert_arg("rnnalgo", 'a', "0", "default, fundamental.", "int");
+    parser.insert_arg("seed_high", 'M', "0", "Most significant 32 bits of seed.", "int");
+    parser.insert_arg("seed_low", 'L', "0", "Least significant 32 bits of seed.", "int");
+    parser.insert_arg("seq_len", 'k', "10", "Number of iterations to unroll over.", "int");
+    parser.insert_arg("time", 't', "0", "Time Each Layer.", "int");
+    parser.insert_arg("use_dropout", 'U', "0", "Use dropout: 1; Not use dropout: 0.", "int");
+    parser.insert_arg("use_padding", 'q', "0", "packed tensors == 0 or padded == 1.", "int");
+    parser.insert_arg("verify", 'V', "1", "Verify Each Layer.", "int");
+    parser.insert_arg("wall", 'w', "0", "Wall-clock Time Each Layer, Requires time == 1.", "int");
+
+    // parse arg
+    if(!parser.parse(argc, argv)) return -1;
+
+    // TODO: uncomment when using
+    int batchsize       = parser.get_arg_int("n"); //"4", "Mini-batch size.", "int");
+    int bias            = parser.get_arg_int("b"); //"0", "Use Bias.", "int");
+    int bidirection     = parser.get_arg_int("r"); //"0", "0 uni- or 1 bi-direction.", "int");
+    // int datatype     = parser.get_arg_int("f"); //"1", "16-bit or 32-bit fp.", "int");
+    int dropout         = parser.get_arg_int("P"); //"0.0", "Dropout rate.", "float");
+    // int dump_output  = parser.get_arg_int("o"); //"0", "Dumps the output buffers.", "int");
+    int forw         = parser.get_arg_int("F"); //"0", "Run only Forward RNN == 1 or only Backward Data RNN == 2, Backward Weights = 4 or all == 0.", "int");
+    // int fwdtype      = parser.get_arg_int("c"); //"0", "RNN forward being 0 training or 1 inference.", "int");
+    int hid_h           = parser.get_arg_int("H"); //"32", "Hidden State Length.", "int");
+    int in_h            = parser.get_arg_int("W"); //"32", "Input Length.", "int");
+    int inputmode       = parser.get_arg_int("p"); //"0", "linear == 0 or skip == 1.", "int");
+    int num_warmup      = LOOP_WARMUP;
+    int num_iterations  = parser.get_arg_int("i"); //"10", "Number of Iterations.", "int");
+    int num_layer       = parser.get_arg_int("l"); //"1", "Number of hidden stacks.", "int");
+    // int rnnalgo      = parser.get_arg_int("a"); //"0", "default, fundamental.", "int");
+    // int seed_high    = parser.get_arg_int("M"); //"0", "Most significant 32 bits of seed.", "int");
+    // int seed_low     = parser.get_arg_int("L"); //"0", "Least significant 32 bits of seed.", "int");
+    int seq_len         = parser.get_arg_int("k"); //"10", "Number of iterations to unroll over.", "int");
+    int time_enabled = parser.get_arg_int("t"); //"0", "Time Each Layer.", "int");
+    int use_dropout     = parser.get_arg_int("U"); //"0", "Use dropout: 1; Not use dropout: 0.", "int");
+    // int use_padding  = parser.get_arg_int("q"); //"0", "packed tensors == 0 or padded == 1.", "int");
+    // int verify       = parser.get_arg_int("V"); //"1", "Verify Each Layer.", "int");
+    // int wall         = parser.get_arg_int("w"); //"0", "Wall-clock Time Each Layer, Requires time == 1.", "int");
+    std::string mode    = parser.get_arg("m"); //"tanh", "RNN Mode (relu, tanh, lstm, gru).", "str");
+
+    int is_fwd = (forw == 0 || forw & 1) ? 1 : 0;
+    int is_bwd = (forw == 0 || forw & 2) ? 1 : 0;
+    int is_wrw = (forw == 0 || forw & 4) ? 1 : 0;
+
+    cudnnRNNMode_t cellMode = CUDNN_RNN_TANH;
+    if (mode == "relu")
+        cellMode = CUDNN_RNN_RELU;
+    else if (mode == "tanh")
+        cellMode = CUDNN_RNN_TANH;
+    else if (mode == "lstm")
+        cellMode = CUDNN_LSTM;
+    else if (mode == "gru")
+        cellMode = CUDNN_GRU;
+
+    rnn_desc_t* rnn_desc = gpu_dev->rnn_desc_create();
+    operator_base* rnn_base = operator_create(gpu_dev, OP_RNN, rnn_desc);
+    enum tensor_data_type tensor_dtype = get_tensor_type_t<dtype>::get();
+
+    // // defalut arguments
+    // ((op_rnn*)rnn_base)->dataType            = (tensor_dtype == TENSOR_DT_FLOAT) ? CUDNN_DATA_FLOAT : CUDNN_DATA_HALF;
+    // ((op_rnn*)rnn_base)->seqLength           = 32;
+    // ((op_rnn*)rnn_base)->numLayers           = 8;
+    // ((op_rnn*)rnn_base)->inputSize           = 224;
+    // ((op_rnn*)rnn_base)->hiddenSize          = 1000;
+    // ((op_rnn*)rnn_base)->outputSize          = 1000;
+    // ((op_rnn*)rnn_base)->miniBatch           = 32;
+    // ((op_rnn*)rnn_base)->rnnInputMode        = CUDNN_LINEAR_INPUT;
+    // ((op_rnn*)rnn_base)->recurrencePattern   = CUDNN_UNIDIRECTIONAL;
+    // ((op_rnn*)rnn_base)->rnnCellMode         = CUDNN_LSTM;
+    // ((op_rnn*)rnn_base)->rnnBiasMode         = CUDNN_RNN_DOUBLE_BIAS;
+    // ((op_rnn*)rnn_base)->rnnAlgorithm        = CUDNN_RNN_ALGO_STANDARD;
+    // ((op_rnn*)rnn_base)->mathPrecision       = (tensor_dtype == TENSOR_DT_FLOAT) ? CUDNN_DATA_FLOAT : CUDNN_DATA_HALF;
+    // ((op_rnn*)rnn_base)->mathType            = CUDNN_DEFAULT_MATH;
+    // ((op_rnn*)rnn_base)->dropout             = 0.0;
+    // ((op_rnn*)rnn_base)->warmupIterations    = LOOP_WARMUP;
+    // ((op_rnn*)rnn_base)->measureIterations   = LOOP_ITR;
+
+    // user arguments
+    ((op_rnn*)rnn_base)->dataType            = (tensor_dtype == TENSOR_DT_FLOAT) ? CUDNN_DATA_FLOAT : CUDNN_DATA_HALF;
+    ((op_rnn*)rnn_base)->seqLength           = seq_len;
+    ((op_rnn*)rnn_base)->numLayers           = num_layer;
+    ((op_rnn*)rnn_base)->inputSize           = in_h;
+    ((op_rnn*)rnn_base)->hiddenSize          = hid_h;
+    ((op_rnn*)rnn_base)->outputSize          = hid_h;
+    ((op_rnn*)rnn_base)->miniBatch           = batchsize;
+    ((op_rnn*)rnn_base)->rnnInputMode        = cudnnRNNInputMode_t(inputmode);
+    ((op_rnn*)rnn_base)->recurrencePattern   = cudnnDirectionMode_t(bidirection);
+    ((op_rnn*)rnn_base)->rnnCellMode         = cellMode;
+    ((op_rnn*)rnn_base)->rnnBiasMode         = bias ? CUDNN_RNN_DOUBLE_BIAS : CUDNN_RNN_NO_BIAS;
+    ((op_rnn*)rnn_base)->rnnAlgorithm        = CUDNN_RNN_ALGO_STANDARD;
+    ((op_rnn*)rnn_base)->mathPrecision       = (tensor_dtype == TENSOR_DT_FLOAT) ? CUDNN_DATA_FLOAT : CUDNN_DATA_HALF;
+    ((op_rnn*)rnn_base)->mathType            = CUDNN_DEFAULT_MATH;
+    ((op_rnn*)rnn_base)->dropout             = use_dropout ? dropout : 0.0;
+    ((op_rnn*)rnn_base)->warmupIterations    = num_warmup;
+    ((op_rnn*)rnn_base)->measureIterations   = num_iterations;
+
+    rnn_base->tune_op();
+
+    if (is_fwd) {
+        rnn_base->forward();
+
+        if (time_enabled)
+            rnn_base->print_fwd_time(((op_rnn*)rnn_base)->timeForward);
+    }
+
+    if (is_bwd) {
+        rnn_base->backward_data();
+
+        if (time_enabled)
+            rnn_base->print_bwd_time(((op_rnn*)rnn_base)->timeBackwardData);
+    }
+
+    if (is_wrw) {
+        rnn_base->backward_filter();
+
+        if (time_enabled)
+            rnn_base->print_wrw_time(((op_rnn*)rnn_base)->timeBackwardWeights);
+    }
+
+    // clean-up
+    operator_destroy(rnn_base);
+    gpu_dev->rnn_desc_destroy(rnn_desc);
+
+    return 0;
+}
+#endif
+
 int main(int argc, char ** argv){
     gpu_dev = determin_device();
     cpu_dev = device_create(DEVICE_C, 0);
@@ -1207,6 +1351,10 @@ int main(int argc, char ** argv){
         rtn = conv_driver<fp32_t>(argc, argv);
     else if(op_type == "convfp16")
         rtn = conv_driver<fp16_t>(argc, argv);
+    else if (op_type == "rnn")
+        rtn = rnn_driver<fp32_t>(argc, argv);
+    else if(op_type == "rnnfp16")
+        rtn = rnn_driver<fp16_t>(argc, argv);
 #endif
 
     device_destroy(gpu_dev);

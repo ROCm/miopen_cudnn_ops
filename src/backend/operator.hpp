@@ -2,9 +2,11 @@
 #define __OPERATOR_HPP
 
 #include "backend.hpp"
+#include "rnn.h"
 
 enum operator_type{
     OP_CONV = 0,
+    OP_RNN,
     OP_POOLING,
     OP_ACTIVATION
 };
@@ -38,9 +40,9 @@ public:
 #undef SAFE_ALLOC
     }
 
-	virtual void print_fwd_time(const float kernel_average_time) = 0;
-	virtual void print_bwd_time(const float kernel_average_time) = 0;
-	virtual void print_wrw_time(const float kernel_average_time) = 0;
+    virtual void print_fwd_time(const float kernel_average_time) = 0;
+    virtual void print_bwd_time(const float kernel_average_time) = 0;
+    virtual void print_wrw_time(const float kernel_average_time) = 0;
 
     tensor_t * input ={nullptr};
     tensor_t * output ={nullptr};
@@ -88,9 +90,9 @@ public:
     virtual std::string get_bwd_data_name(){return std::string("");}
     virtual std::string get_bwd_filter_name(){return std::string("");}
 
-	virtual void print_fwd_time(const float kernel_average_time) {}
-	virtual void print_bwd_time(const float kernel_average_time) {}
-	virtual void print_wrw_time(const float kernel_average_time) {}
+    virtual void print_fwd_time(const float kernel_average_time) {}
+    virtual void print_bwd_time(const float kernel_average_time) {}
+    virtual void print_wrw_time(const float kernel_average_time) {}
 
     convolution_desc_t * conv_desc;
 
@@ -115,9 +117,9 @@ public:
     virtual std::string get_fwd_algo_name();
     virtual std::string get_bwd_data_name();
     virtual std::string get_bwd_filter_name();
-	virtual void print_fwd_time(const float kernel_average_time);
-	virtual void print_bwd_time(const float kernel_average_time);
-	virtual void print_wrw_time(const float kernel_average_time);
+    virtual void print_fwd_time(const float kernel_average_time);
+    virtual void print_bwd_time(const float kernel_average_time);
+    virtual void print_wrw_time(const float kernel_average_time);
     miopenConvFwdAlgorithm_t fwd_algo;
     miopenConvBwdWeightsAlgorithm_t bwd_weights_algo;
     miopenConvBwdDataAlgorithm_t bwd_data_algo;
@@ -139,9 +141,9 @@ public:
     virtual std::string get_fwd_algo_name();
     virtual std::string get_bwd_data_name();
     virtual std::string get_bwd_filter_name();
-	virtual void print_fwd_time(const float kernel_average_time);
-	virtual void print_bwd_time(const float kernel_average_time);
-	virtual void print_wrw_time(const float kernel_average_time);
+    virtual void print_fwd_time(const float kernel_average_time);
+    virtual void print_bwd_time(const float kernel_average_time);
+    virtual void print_wrw_time(const float kernel_average_time);
     cudnnFilterDescriptor_t filter_desc;
     cudnnConvolutionFwdAlgo_t fwd_algo;
     cudnnConvolutionBwdFilterAlgo_t bwd_filter_algo;
@@ -248,6 +250,126 @@ public:
 
 };
 #endif
+#endif
+/*****************************************************************************
+ * rnn op
+*/
+
+class op_rnn : public operator_base{
+public:
+    op_rnn(void * desc) :
+        rnn(NULL),
+        rnnfp16(NULL),
+        timeForward(0.0),
+        timeBackwardData(0.0),
+        timeBackwardWeights(0.0)
+    {
+        rnn_desc = (rnn_desc_t*)desc;
+    }
+    ~op_rnn()
+    {
+        if (rnn != NULL)
+            delete rnn;
+        if (rnnfp16 != NULL)
+            delete rnnfp16;
+    }
+
+    virtual void forward();
+    virtual void backward();
+    virtual void backward_data();
+    virtual void backward_filter();
+    virtual void tune_op(){}
+    virtual void infer_shape(size_t * out_dim){}
+
+    virtual std::string get_bwd_filter_name(){return std::string("");}
+
+    virtual void print_fwd_time(const float kernel_average_time) {}
+    virtual void print_bwd_time(const float kernel_average_time) {}
+    virtual void print_wrw_time(const float kernel_average_time) {}
+
+    rnn_desc_t * rnn_desc;
+
+    RNN_IMPL<float>* rnn;
+    RNN_IMPL<half>* rnnfp16;
+
+    float timeForward;
+    float timeBackwardData;
+    float timeBackwardWeights;
+
+    // data type (0-FP32, 2-FP16)
+    cudnnDataType_t dataType;
+    // math precision (0-FP32, 2-FP16)
+    cudnnDataType_t mathPrecision;
+    // math type (0-default, 1-tensor op math, 2-tensor op math with conversion)
+    cudnnMathType_t mathType;
+    // recurrence pattern (0-unidirectional, 1-bidirectional)
+    cudnnDirectionMode_t recurrencePattern;
+    // recurrence algorithm (0-standard, 1-persist static, 2-persist dynamics)
+    cudnnRNNAlgo_t rnnAlgorithm;
+    // bias mode (0-no bias, 1-inp bias, 2-double bias, 3-rec bias)
+    cudnnRNNBiasMode_t rnnBiasMode;
+    // cell type (0-RELU, 1-TANH, 2-LSTM, 3-GRU)
+    cudnnRNNMode_t rnnCellMode;
+    // input mode (0-linear input, 1-skip input)
+    cudnnRNNInputMode_t rnnInputMode;
+
+    // dropout rate
+    float dropout;
+    // hidden size
+    int hiddenSize;
+    // input vector size
+    int inputSize;
+    // max miniBatch size
+    int miniBatch;
+    // number of layers
+    int numLayers;
+    // LSTM cell output size after the recurrent projection
+    int outputSize;
+    // sequence length
+    int seqLength;
+
+    // number of warm-up iterations
+    int warmupIterations;
+    // number of measurement iterations
+    int measureIterations;
+};
+
+#ifdef WITH_MIOPEN
+class op_rnn_miopen : public op_rnn{
+public:
+   op_rnn_miopen(void * desc);
+    ~op_rnn_miopen();
+    virtual void tune_op();
+    virtual void forward();
+    virtual void backward();
+    virtual void backward_data();
+    virtual void backward_filter();
+    virtual std::string get_fwd_algo_name();
+    virtual std::string get_bwd_data_name();
+    virtual std::string get_bwd_filter_name();
+    virtual void print_fwd_time(const float kernel_average_time);
+    virtual void print_bwd_time(const float kernel_average_time);
+    virtual void print_wrw_time(const float kernel_average_time);
+};
+#endif
+
+#ifdef WITH_CUDNN
+class op_rnn_cudnn : public op_rnn{
+public:
+   op_rnn_cudnn(void * desc);
+    ~op_rnn_cudnn();
+    virtual void tune_op();
+    virtual void forward();
+    virtual void backward();
+    virtual void backward_data();
+    virtual void backward_filter();
+    virtual std::string get_fwd_algo_name();
+    virtual std::string get_bwd_data_name();
+    virtual std::string get_bwd_filter_name();
+    virtual void print_fwd_time(const float kernel_average_time);
+    virtual void print_bwd_time(const float kernel_average_time);
+    virtual void print_wrw_time(const float kernel_average_time);
+};
 #endif
 
 /*****************************************************************************

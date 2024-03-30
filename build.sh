@@ -22,5 +22,5 @@ echo $CMAKE_BACKEND
 
 rm -rf build
 mkdir build && cd build
-cmake $CMAKE_BACKEND ../ || exit 1
+cmake -DCMAKE_BUILD_TYPE=Debug $CMAKE_BACKEND ../ || exit 1
 make -j`nproc`

@@ -28,7 +28,6 @@ device_cuda::device_cuda(int dev_id){
         dump_dev_prop(&cuda_prop, i);
     }
 
-    
     cudaStream_t q;
     CHECK_CUDA(cudaSetDevice(dev_id));
     CHECK_CUDA(cudaStreamCreate(&q));
@@ -107,7 +106,7 @@ void device_cuda::device_timer_destroy(device_timer_t * dt){
         return;
     delete (device_timer_cuda*)dt;
 }
-tensor_t * device_cuda::tensor_create(size_t * dims, size_t n_dim, 
+tensor_t * device_cuda::tensor_create(size_t * dims, size_t n_dim,
         tensor_data_type data_type, tensor_layout layout){
 
     if(n_dim == 1 && layout == TENSOR_LAYOUT_1D){
@@ -148,7 +147,7 @@ tensor_t * device_cuda::tensor_create(size_t * dims, size_t n_dim,
 }
 
 #if 0
-tensor_t * device_cuda::filter_create(size_t * dims, size_t n_dim, 
+tensor_t * device_cuda::filter_create(size_t * dims, size_t n_dim,
         tensor_data_type data_type, tensor_layout layout){
     if(n_dim == 1 && layout == TENSOR_LAYOUT_1D){
         //void* ptr;
@@ -169,7 +168,7 @@ tensor_t * device_cuda::filter_create(size_t * dims, size_t n_dim,
     cudnnFilterDescriptor_t desc;
     CHECK_CUDNN(cudnnCreateFilterDescriptor(&desc));
     CHECK_CUDNN(cudnnSetFilter4dDescriptor(desc, to_cudnn_data_type(data_type),
-				to_cudnn_layout(layout), dims[0], dims[1], dims[2], dims[3]));
+                to_cudnn_layout(layout), dims[0], dims[1], dims[2], dims[3]));
 
     //void* ptr;
     //CHECK_CUDA(cudaMalloc(&ptr, dims[0]*dims[1]*dims[2]*dims[3]*data_type_unit(data_type)));
@@ -239,7 +238,7 @@ pooling_desc_t * device_cuda::pooling_desc_create(int * kernel, int * stride, in
     CHECK_CUDNN(cudnnCreatePoolingDescriptor(&desc));
     CHECK_CUDNN(cudnnSetPooling2dDescriptor(desc, pool_mode, CUDNN_PROPAGATE_NAN,
         kernel[0], kernel[1], padding[0], padding[1], stride[0], stride[1]));
-    
+
     pooling_desc_t *pooling_desc = new pooling_desc_t;
     pooling_desc->mode = mode;
     pooling_desc->n_dims = 2;
@@ -287,10 +286,10 @@ convolution_desc_t * device_cuda::convolution_desc_create(convolution_mode mode,
     CHECK_CUDNN(cudnnSetConvolutionNdDescriptor(desc, n_dims,
             padding, stride, dilation, to_cudnn_convolution_mode(mode), to_cudnn_data_type(dt)));
 #else
-	assert(n_dims == 2);
+    assert(n_dims == 2);
     CHECK_CUDNN(cudnnSetConvolution2dDescriptor(desc, padding[0], padding[1],
-				stride[0], stride[1], dilation[0], dilation[1],
-				to_cudnn_convolution_mode(mode), to_cudnn_data_type(dt)));
+                stride[0], stride[1], dilation[0], dilation[1],
+                to_cudnn_convolution_mode(mode), to_cudnn_data_type(dt)));
 #endif
 
 
@@ -301,7 +300,7 @@ convolution_desc_t * device_cuda::convolution_desc_create(convolution_mode mode,
 #endif
 
     if(groups != 1)
-		CHECK_CUDNN(cudnnSetConvolutionGroupCount(desc, groups));
+        CHECK_CUDNN(cudnnSetConvolutionGroupCount(desc, groups));
 
     convolution_desc_t * conv_desc = new convolution_desc_t;
     conv_desc->mode = mode;
@@ -330,8 +329,8 @@ convolution_desc_t * device_cuda::convolution_desc_create(convolution_mode mode,
         CHECK_CUDNN(cudnnCreateConvolutionDescriptor(&desc_wrw));
 
         CHECK_CUDNN(cudnnSetConvolution2dDescriptor(desc_wrw, padding[0], padding[1],
-				stride[0], stride[1], dilation[0], dilation[1],
-				CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
+                stride[0], stride[1], dilation[0], dilation[1],
+                CUDNN_CROSS_CORRELATION, CUDNN_DATA_FLOAT));
 #ifndef OP_CUDNN_FP16_NO_TENSORCORE
         if(dt == TENSOR_DT_HALF){
             CHECK_CUDNN(cudnnSetConvolutionMathType(desc_wrw, CUDNN_TENSOR_OP_MATH));
@@ -351,6 +350,16 @@ void device_cuda::convolution_desc_destroy(convolution_desc_t * conv_desc)
     if(conv_desc->desc_wrw)
         CHECK_CUDNN(cudnnDestroyConvolutionDescriptor((cudnnConvolutionDescriptor_t)conv_desc->desc_wrw));
     delete conv_desc;
+}
+rnn_desc_t * device_cuda::rnn_desc_create()
+{
+    rnn_desc_t * rnn_desc = new rnn_desc_t;
+
+    return rnn_desc;
+}
+void device_cuda::rnn_desc_destroy(rnn_desc_t * rnn_desc)
+{
+    delete rnn_desc;
 }
 
 void dump_cudnn_convolution_desc(const cudnnConvolutionDescriptor_t conv_desc){
@@ -377,7 +386,7 @@ void dump_cudnn_tensor_desc(const cudnnTensorDescriptor_t tensor_desc){
     int n,c,h,w;
     int n_stride, c_stride, h_stride, w_stride;
     cudnnDataType_t dt;
-    CHECK_CUDNN(cudnnGetTensor4dDescriptor(tensor_desc, &dt, &n, &c, &h, &w, 
+    CHECK_CUDNN(cudnnGetTensor4dDescriptor(tensor_desc, &dt, &n, &c, &h, &w,
         &n_stride, &c_stride, &h_stride, &w_stride));
     std::cout<<"<tensor desc> dt:"<<dt<<", n:"<<n<<", c:"<<c<<", h:"<<h<<", w:"<<w<<
         ", n_stride:"<<n_stride<<", c_stride:"<<c_stride<<", h_stride:"<<h_stride<<", w_stride:"<<w_stride<<std::endl;

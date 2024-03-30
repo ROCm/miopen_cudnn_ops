@@ -89,19 +89,19 @@ void op_convolution_cudnn::tune_op(){
         forward_tuned = 1;
         CHECK_CUDNN(cudnnCreateFilterDescriptor(&filter_desc));
         CHECK_CUDNN(cudnnSetFilter4dDescriptor(filter_desc,
-	                to_cudnn_data_type(filter->data_type),
+                    to_cudnn_data_type(filter->data_type),
                     /* CUDNN_TENSOR_NCHW->KCRS, K->out feature map, C->input feat map, R->row per filter, S->col per filter*/
-                    to_cudnn_layout(filter->layout), 
+                    to_cudnn_layout(filter->layout),
                     conv_desc->k,
                     //https://docs.nvidia.com/deeplearning/sdk/cudnn-developer-guide/index.html#grouped-convolutions
                     conv_desc->input_c/conv_desc->groups,
                     conv_desc->kernel[0], conv_desc->kernel[1]));
 
         // TODO: set CUDNN_TENSOR_OP_MATH can use tensor core if available, here disable it
-		/*
+        /*
         CHECK_CUDNN(cudnnSetConvolutionMathType((const cudnnConvolutionDescriptor_t)conv_desc->desc,
                 CUDNN_DEFAULT_MATH));
-				*/
+                */
 
         // find fwd algo
 #if 1
@@ -172,7 +172,7 @@ void op_convolution_cudnn::tune_op(){
         // find bwd data algo
         cudnnConvolutionBwdDataAlgoPerf_t perfs_data[5];
         int returned_algos;
-        CHECK_CUDNN(cudnnFindConvolutionBackwardDataAlgorithm(dev_cuda->handle, 
+        CHECK_CUDNN(cudnnFindConvolutionBackwardDataAlgorithm(dev_cuda->handle,
             filter_desc,
             (const cudnnTensorDescriptor_t)output_grad->desc,
             (const cudnnConvolutionDescriptor_t)conv_desc->desc,
@@ -217,8 +217,8 @@ void op_convolution_cudnn::tune_op(){
         }
     }
 
-	if (!filter_grad)
-		return;
+    if (!filter_grad)
+        return;
 
     if(!backward_filter_tuned){
         backward_filter_tuned = 1;
@@ -229,7 +229,7 @@ void op_convolution_cudnn::tune_op(){
         // find bwd filter algo
         cudnnConvolutionBwdFilterAlgoPerf_t perfs_filter[5];
         int returned_algos;
-        CHECK_CUDNN(cudnnFindConvolutionBackwardFilterAlgorithm(dev_cuda->handle, 
+        CHECK_CUDNN(cudnnFindConvolutionBackwardFilterAlgorithm(dev_cuda->handle,
             (const cudnnTensorDescriptor_t)input->desc,
             (const cudnnTensorDescriptor_t)output_grad->desc,
             need_psudo_fp16_config ? (const cudnnConvolutionDescriptor_t)conv_desc->desc_wrw : (const cudnnConvolutionDescriptor_t)conv_desc->desc,
@@ -360,53 +360,53 @@ std::string op_convolution_cudnn::get_bwd_filter_name(){
 }
 
 void op_convolution_cudnn::print_fwd_time(const float kernel_average_time) {
-	std::string fwd_algo_name = get_fwd_algo_name();
-	std::cout << "OpDriver Forward Conv. Algorithm: " << fwd_algo_name << "." << std::endl;
+    std::string fwd_algo_name = get_fwd_algo_name();
+    std::cout << "OpDriver Forward Conv. Algorithm: " << fwd_algo_name << "." << std::endl;
 
-	printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
-	int in_n, in_c, in_h, in_w;
-	int wei_k, wei_c, wei_h, wei_w;
-	int out_n, out_c, out_h, out_w;
-	
+    printf("GPU Kernel Time Forward Conv. Elapsed: %f ms (average)\n", kernel_average_time);
+    int in_n, in_c, in_h, in_w;
+    int wei_k, wei_c, wei_h, wei_w;
+    int out_n, out_c, out_h, out_w;
+
     cudnnDataType_t dt;
     cudnnTensorFormat_t fmt;
     int n_stride, c_stride, h_stride, w_stride;
 
-	CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)input->desc, &dt,
-				&in_n, &in_c, &in_h, &in_w, &n_stride, &c_stride, &h_stride, &w_stride));
-	CHECK_CUDNN(cudnnGetFilter4dDescriptor((cudnnFilterDescriptor_t)filter_desc, &dt,
-				&fmt, &wei_k, &wei_c, &wei_h, &wei_w));
-	CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)output->desc, &dt,
-				&out_n, &out_c, &out_h, &out_w, &n_stride, &c_stride, &h_stride, &w_stride));
+    CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)input->desc, &dt,
+                &in_n, &in_c, &in_h, &in_w, &n_stride, &c_stride, &h_stride, &w_stride));
+    CHECK_CUDNN(cudnnGetFilter4dDescriptor((cudnnFilterDescriptor_t)filter_desc, &dt,
+                &fmt, &wei_k, &wei_c, &wei_h, &wei_w));
+    CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)output->desc, &dt,
+                &out_n, &out_c, &out_h, &out_w, &n_stride, &c_stride, &h_stride, &w_stride));
 
-	debug_msg("input:(%d,%d,%d,%d), filer:(%d,%d,%d,%d), output:(%d,%d,%d,%d)\n",
-			in_n, in_c, in_h, in_w, wei_k, wei_c, wei_h, wei_w, out_n, out_c, out_h, out_w);
+    debug_msg("input:(%d,%d,%d,%d), filer:(%d,%d,%d,%d), output:(%d,%d,%d,%d)\n",
+            in_n, in_c, in_h, in_w, wei_k, wei_c, wei_h, wei_w, out_n, out_c, out_h, out_w);
 
-	size_t flopCnt = 2L * in_n * in_c * wei_h * wei_w * out_c * out_h * out_w / conv_desc->groups;
-	size_t inBytes = in_n * in_c * in_h * in_w * data_type_unit(input->data_type);
-	size_t weiBytes = wei_k * wei_c * wei_h * wei_w * data_type_unit(input->data_type);
-	size_t readBytes = inBytes + weiBytes;
-	size_t outputBytes = out_n * out_c * out_h * out_w * data_type_unit(input->data_type);
+    size_t flopCnt = 2L * in_n * in_c * wei_h * wei_w * out_c * out_h * out_w / conv_desc->groups;
+    size_t inBytes = in_n * in_c * in_h * in_w * data_type_unit(input->data_type);
+    size_t weiBytes = wei_k * wei_c * wei_h * wei_w * data_type_unit(input->data_type);
+    size_t readBytes = inBytes + weiBytes;
+    size_t outputBytes = out_n * out_c * out_h * out_w * data_type_unit(input->data_type);
 
-	printf("stats: name, n, c, ho, wo, x, y, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
-			   "GB/s, timeMs\n");
-	printf("stats: %s%dx%d, %u, %u, %u, %u, %u, %u, %u, %zu, %zu, %zu, %.0f, %.0f, %f\n",
-		   "fwd-conv",
-		   wei_h,
-		   wei_w,
-		   in_n,
-		   in_c,
-		   out_h,
-		   out_w,
-		   wei_h,
-		   wei_w,
-		   out_c,
-		   flopCnt,
-		   readBytes,
-		   outputBytes,
-		   flopCnt / kernel_average_time / 1e6,
-		   (readBytes + outputBytes) / kernel_average_time / 1e6,
-		   kernel_average_time);
+    printf("stats: name, n, c, ho, wo, x, y, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
+               "GB/s, timeMs\n");
+    printf("stats: %s%dx%d, %u, %u, %u, %u, %u, %u, %u, %zu, %zu, %zu, %.0f, %.0f, %f\n",
+           "fwd-conv",
+           wei_h,
+           wei_w,
+           in_n,
+           in_c,
+           out_h,
+           out_w,
+           wei_h,
+           wei_w,
+           out_c,
+           flopCnt,
+           readBytes,
+           outputBytes,
+           flopCnt / kernel_average_time / 1e6,
+           (readBytes + outputBytes) / kernel_average_time / 1e6,
+           kernel_average_time);
 #ifdef OP_LOG_TO_FILE
     {
         FILE * fp = get_fp();
@@ -429,55 +429,55 @@ void op_convolution_cudnn::print_fwd_time(const float kernel_average_time) {
 }
 
 void op_convolution_cudnn::print_bwd_time(const float kernel_average_time) {
-	std::string algo_name = get_bwd_data_name();
-	std::cout << "OpDriver Backward Data Conv. Algorithm: " << algo_name << "." << std::endl;
+    std::string algo_name = get_bwd_data_name();
+    std::cout << "OpDriver Backward Data Conv. Algorithm: " << algo_name << "." << std::endl;
 
-	printf("GPU Kernel Time Backward Data Conv. Elapsed: %f ms (average)\n", kernel_average_time);
-	int in_n, in_c, in_h, in_w;
-	int wei_k, wei_c, wei_h, wei_w;
-	int out_n, out_c, out_h, out_w;
-	
+    printf("GPU Kernel Time Backward Data Conv. Elapsed: %f ms (average)\n", kernel_average_time);
+    int in_n, in_c, in_h, in_w;
+    int wei_k, wei_c, wei_h, wei_w;
+    int out_n, out_c, out_h, out_w;
+
     cudnnDataType_t dt;
     cudnnTensorFormat_t fmt;
     int n_stride, c_stride, h_stride, w_stride;
 
-	CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)input->desc, &dt,
-				&in_n, &in_c, &in_h, &in_w, &n_stride, &c_stride, &h_stride,
-				&w_stride));
-	CHECK_CUDNN(cudnnGetFilter4dDescriptor((cudnnFilterDescriptor_t)filter_desc, &dt,
-				&fmt, &wei_k, &wei_c, &wei_h, &wei_w));
-	CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)output->desc, &dt,
-				&out_n, &out_c, &out_h, &out_w, &n_stride, &c_stride, &h_stride,
-				&w_stride));
+    CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)input->desc, &dt,
+                &in_n, &in_c, &in_h, &in_w, &n_stride, &c_stride, &h_stride,
+                &w_stride));
+    CHECK_CUDNN(cudnnGetFilter4dDescriptor((cudnnFilterDescriptor_t)filter_desc, &dt,
+                &fmt, &wei_k, &wei_c, &wei_h, &wei_w));
+    CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)output->desc, &dt,
+                &out_n, &out_c, &out_h, &out_w, &n_stride, &c_stride, &h_stride,
+                &w_stride));
 
-	debug_msg("input:(%d,%d,%d,%d), filer:(%d,%d,%d,%d), output:(%d,%d,%d,%d)\n",
-			in_n, in_c, in_h, in_w, wei_k, wei_c, wei_h, wei_w, out_n, out_c, out_h, out_w);
+    debug_msg("input:(%d,%d,%d,%d), filer:(%d,%d,%d,%d), output:(%d,%d,%d,%d)\n",
+            in_n, in_c, in_h, in_w, wei_k, wei_c, wei_h, wei_w, out_n, out_c, out_h, out_w);
 
-	size_t flopCnt = 2L * in_n * in_c * wei_h * wei_w * out_c * out_h * out_w / conv_desc->groups;
-	size_t inBytes = in_n * in_c * in_h * in_w * data_type_unit(input->data_type);
-	size_t weiBytes = wei_k * wei_c * wei_h * wei_w * data_type_unit(input->data_type);
-	size_t readBytes = inBytes + weiBytes;
-	size_t outputBytes = out_n * out_c * out_h * out_w * data_type_unit(input->data_type);
+    size_t flopCnt = 2L * in_n * in_c * wei_h * wei_w * out_c * out_h * out_w / conv_desc->groups;
+    size_t inBytes = in_n * in_c * in_h * in_w * data_type_unit(input->data_type);
+    size_t weiBytes = wei_k * wei_c * wei_h * wei_w * data_type_unit(input->data_type);
+    size_t readBytes = inBytes + weiBytes;
+    size_t outputBytes = out_n * out_c * out_h * out_w * data_type_unit(input->data_type);
 
-	printf("stats: name, n, c, ho, wo, x, y, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
-			   "GB/s, timeMs\n");
-	printf("stats: %s%dx%d, %u, %u, %u, %u, %u, %u, %u, %zu, %zu, %zu, %.0f, %.0f, %f\n",
-		   "bwdd-conv",
-		   wei_h,
-		   wei_w,
-		   in_n,
-		   in_c,
-		   out_h,
-		   out_w,
-		   wei_h,
-		   wei_w,
-		   out_c,
-		   flopCnt,
-		   readBytes,
-		   outputBytes,
-		   flopCnt / kernel_average_time / 1e6,
-		   (readBytes + outputBytes) / kernel_average_time / 1e6,
-		   kernel_average_time);
+    printf("stats: name, n, c, ho, wo, x, y, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
+               "GB/s, timeMs\n");
+    printf("stats: %s%dx%d, %u, %u, %u, %u, %u, %u, %u, %zu, %zu, %zu, %.0f, %.0f, %f\n",
+           "bwdd-conv",
+           wei_h,
+           wei_w,
+           in_n,
+           in_c,
+           out_h,
+           out_w,
+           wei_h,
+           wei_w,
+           out_c,
+           flopCnt,
+           readBytes,
+           outputBytes,
+           flopCnt / kernel_average_time / 1e6,
+           (readBytes + outputBytes) / kernel_average_time / 1e6,
+           kernel_average_time);
 #ifdef OP_LOG_TO_FILE
     {
         FILE * fp = get_fp();
@@ -502,55 +502,55 @@ void op_convolution_cudnn::print_bwd_time(const float kernel_average_time) {
 }
 
 void op_convolution_cudnn::print_wrw_time(const float kernel_average_time) {
-	std::string algo_name = get_bwd_filter_name();
+    std::string algo_name = get_bwd_filter_name();
     bool need_psudo_fp16_config = filter->data_type == TENSOR_DT_HALF && filter->layout == TENSOR_LAYOUT_NHWC;
-	std::cout << "OpDriver Backward Weights Conv. Algorithm: " << algo_name << "." <<(need_psudo_fp16_config?"[PSUDO_FP16_CONFIG]":"")  << std::endl;
-    
+    std::cout << "OpDriver Backward Weights Conv. Algorithm: " << algo_name << "." <<(need_psudo_fp16_config?"[PSUDO_FP16_CONFIG]":"")  << std::endl;
 
-	printf("GPU Kernel Time Backward Weights Conv. Elapsed: %f ms (average)\n", kernel_average_time);
-	int in_n, in_c, in_h, in_w;
-	int wei_k, wei_c, wei_h, wei_w;
-	int out_n, out_c, out_h, out_w;
-	
+
+    printf("GPU Kernel Time Backward Weights Conv. Elapsed: %f ms (average)\n", kernel_average_time);
+    int in_n, in_c, in_h, in_w;
+    int wei_k, wei_c, wei_h, wei_w;
+    int out_n, out_c, out_h, out_w;
+
     cudnnDataType_t dt;
     cudnnTensorFormat_t fmt;
     int n_stride, c_stride, h_stride, w_stride;
 
-	CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)input->desc, &dt,
-				&in_n, &in_c, &in_h, &in_w, &n_stride, &c_stride, &h_stride,
-				&w_stride));
-	CHECK_CUDNN(cudnnGetFilter4dDescriptor((cudnnFilterDescriptor_t)filter_desc, &dt,
-				&fmt, &wei_k, &wei_c, &wei_h, &wei_w));
-	CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)output->desc, &dt,
-				&out_n, &out_c, &out_h, &out_w, &n_stride, &c_stride, &h_stride,
-				&w_stride));
+    CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)input->desc, &dt,
+                &in_n, &in_c, &in_h, &in_w, &n_stride, &c_stride, &h_stride,
+                &w_stride));
+    CHECK_CUDNN(cudnnGetFilter4dDescriptor((cudnnFilterDescriptor_t)filter_desc, &dt,
+                &fmt, &wei_k, &wei_c, &wei_h, &wei_w));
+    CHECK_CUDNN(cudnnGetTensor4dDescriptor((cudnnTensorDescriptor_t)output->desc, &dt,
+                &out_n, &out_c, &out_h, &out_w, &n_stride, &c_stride, &h_stride,
+                &w_stride));
 
-	debug_msg("input:(%d,%d,%d,%d), filer:(%d,%d,%d,%d), output:(%d,%d,%d,%d)\n",
-			in_n, in_c, in_h, in_w, wei_k, wei_c, wei_h, wei_w, out_n, out_c, out_h, out_w);
+    debug_msg("input:(%d,%d,%d,%d), filer:(%d,%d,%d,%d), output:(%d,%d,%d,%d)\n",
+            in_n, in_c, in_h, in_w, wei_k, wei_c, wei_h, wei_w, out_n, out_c, out_h, out_w);
 
-	size_t flopCnt = 2L * in_n * in_c * wei_h * wei_w * out_c * out_h * out_w / conv_desc->groups;
-	size_t readBytes = 0;
-	size_t outputBytes = 0;
+    size_t flopCnt = 2L * in_n * in_c * wei_h * wei_w * out_c * out_h * out_w / conv_desc->groups;
+    size_t readBytes = 0;
+    size_t outputBytes = 0;
 
-	printf("stats: name, n, c, ho, wo, x, y, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
-			   "GB/s, timeMs\n");
-	printf("stats: %s%dx%d, %u, %u, %u, %u, %u, %u, %u, %zu, %zu, %zu, %.0f, %.0f, %f\n",
-		   "bwdw-conv",
-		   wei_h,
-		   wei_w,
-		   in_n,
-		   in_c,
-		   out_h,
-		   out_w,
-		   wei_h,
-		   wei_w,
-		   out_c,
-		   flopCnt,
-		   readBytes,
-		   outputBytes,
-		   flopCnt / kernel_average_time / 1e6,
-		   (readBytes + outputBytes) / kernel_average_time / 1e6,
-		   kernel_average_time);
+    printf("stats: name, n, c, ho, wo, x, y, k, flopCnt, bytesRead, bytesWritten, GFLOPs, "
+               "GB/s, timeMs\n");
+    printf("stats: %s%dx%d, %u, %u, %u, %u, %u, %u, %u, %zu, %zu, %zu, %.0f, %.0f, %f\n",
+           "bwdw-conv",
+           wei_h,
+           wei_w,
+           in_n,
+           in_c,
+           out_h,
+           out_w,
+           wei_h,
+           wei_w,
+           out_c,
+           flopCnt,
+           readBytes,
+           outputBytes,
+           flopCnt / kernel_average_time / 1e6,
+           (readBytes + outputBytes) / kernel_average_time / 1e6,
+           kernel_average_time);
 #ifdef OP_LOG_TO_FILE
     {
         FILE * fp = get_fp();

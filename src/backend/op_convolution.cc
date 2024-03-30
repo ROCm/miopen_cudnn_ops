@@ -69,7 +69,7 @@ void op_convolution::forward(){
 }
 
 void op_convolution::backward(){
-    
+
 }
 void op_convolution::backward_data(){
 
